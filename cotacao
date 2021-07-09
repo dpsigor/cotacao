@@ -1,57 +1,86 @@
 #!/bin/node
-const http = require("https");
+const http = require('https');
 
-const tickerArgs = process.argv.slice(2);
+const tickerArgs = process.argv.slice(2, process.argv.length);
 
 let tickers = [];
 if (tickerArgs.length) {
-  tickers = tickerArgs.map(x => x += '.SAO').map(x => x.toUpperCase());
+  tickers = tickerArgs.map(x => x).map(x => x.toUpperCase());
 } else {
-  tickers = ['ITUB4.SAO', 'FBOK34.SAO', 'TSLA34.SAO', 'AAPL34.SAO'];
+  tickers = [
+    'AAPL34',
+    'BBDC4',
+    'CVCB3',
+    'FBOK34',
+    'ITUB4',
+    'IVVB11',
+    'TSLA34',
+  ];
 }
 
-const formatar = (data) => {
-  // { 'Global Quote': { '01. symbol': string, '02. open': string, _etc... } }
-  const numberKeys = ['02. open', '03. high', '04. low', '05. price', '06. volume', '08. previous close', '09. change'];
-  const infos = data['Global Quote'];
-  if (!infos) return data;
-  numberKeys.forEach(key => {
-    infos[key] = parseFloat(infos[key]);
-  })
-  infos['01. symbol'] = infos['01. symbol'].split('.')[0];
-  return infos;
+const parseHTML = (html, ticker) => {
+  if (!html) {
+    console.error(ticker, 'Req falhou');
+    return null;
+  }
+  const rgx = /YMlKec fxKbKc.+?>R\$(?<price>.+?)<.+?last closing price<.+?<.+?<.+?<.+?P6K39c">R\$(?<prevClose>.+?)<.+?P6K39c">R\$(?<range>.+?)</s;
+  const match = html.match(rgx);
+  if (!match) {
+    console.error('\x1b[33m%s\x1b[0m', `${ticker} Sem match`);
+    return null;
+  }
+  const {
+    price,
+    prevClose,
+    range,
+  } = match.groups;
+  const [min, max] = range.replace('R$', '').split('-').map(parseFloat);
+  return {
+    ticker,
+    min,
+    price: parseFloat(price),
+    max,
+    prevClose: parseFloat(price),
+    change: ((1 - parseFloat(price) / parseFloat(prevClose)) * 100).toFixed(2) + '%',
+  }
 }
 
 const getInfo = async (ticker) => {
-  return new Promise((resolve, reject) => {
-    const options = {
-      "method": "GET",
-      "hostname": "alpha-vantage.p.rapidapi.com",
-      "port": null,
-      "path": `/query?function=GLOBAL_QUOTE&symbol=${ticker}`,
-      "headers": {
-        "x-rapidapi-key": process.env.RAPIDAPI_KEY,
-        "x-rapidapi-host": "alpha-vantage.p.rapidapi.com",
-        "useQueryString": true
-      }
-    };
-    const req = http.request(options, function (res) {
-      const chunks = [];
-      res.on("data", function (chunk) {
-        chunks.push(chunk);
+  try {
+    const timeout = new Promise(res => setTimeout(() => res(), 2000));
+    const req = new Promise(resolve => {
+      const options = {
+        'method': 'GET',
+        'hostname': 'www.google.com',
+        'path': `/finance/quote/${ticker}:BVMF`,
+      };
+      const req = http.request(options, function (res) {
+        const chunks = [];
+        res.on('data', function (chunk) {
+          chunks.push(chunk);
+        });
+        res.on('end', function () {
+          const body = Buffer.concat(chunks);
+          const info = parseHTML(String(body), ticker);
+          resolve(info);
+        });
+        res.on('error', (e) => {
+          console.error(e);
+          resolve();
+        });
       });
-      res.on("end", function () {
-        const body = Buffer.concat(chunks);
-        const info = formatar(JSON.parse(body.toString()));
-        resolve(info);
-      });
-      res.on("error", () => reject(`Erro na pesquisa de ${ticker}`));
+      req.end();
     });
-    req.end();
-  })
+    return Promise.race([timeout, req]);
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
 }
 
 (async () => {
+  console.log();
   const infos = await Promise.all(tickers.map(getInfo));
-  console.table(infos);
+  if (infos.filter(x => !!x).length) console.table(infos.filter(x => !!x));
+  console.log();
 })();
