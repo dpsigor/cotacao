@@ -12,13 +12,13 @@ let tickers = [];
 args.forEach(a => Object.keys(flags).includes(a) ? flags[a] = true : tickers.push(a));
 if (!tickers.length) {
   tickers = [
-		'AAPL34',
-		'AMZO34',
-		'BBDC4',
-		'GOGL34',
-		'ITUB4',
-		'NVDC34',
-		'TSLA34',
+    'AAPL34',
+    'AMZO34',
+    'BBDC4',
+    'GOGL34',
+    'ITUB4',
+    'NVDC34',
+    'TSLA34',
     'CVCB3',
     'FBOK34',
     'IVVB11',
