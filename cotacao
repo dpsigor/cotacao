@@ -3,6 +3,7 @@ const http = require('https');
 
 const tickerArgs = process.argv.slice(2, process.argv.length);
 
+const rgx = new RegExp(/YMlKec fxKbKc[\w\W\n]+?>R\$(?<price>.+?)<[\w\W\n]+?last closing price<[\w\W\n]+?P6K39c">R\$(?<prevClose>.+?)<[\w\W\n]+?P6K39c">R\$(?<minmax>.+?)</s);
 let tickers = [];
 if (tickerArgs.length) {
   tickers = tickerArgs.map(x => x).map(x => x.toUpperCase());
@@ -23,36 +24,33 @@ const parseHTML = (html, ticker) => {
     console.error(ticker, 'Req falhou');
     return null;
   }
-  const rgx = /YMlKec fxKbKc.+?>R\$(?<price>.+?)<.+?last closing price<.+?<.+?<.+?<.+?P6K39c">R\$(?<prevClose>.+?)<.+?P6K39c">R\$(?<range>.+?)</s;
   const match = html.match(rgx);
-  if (!match) {
-    console.error('\x1b[33m%s\x1b[0m', `${ticker} Sem match`);
-    return null;
-  }
+  if (!match) return null;
   const {
     price,
     prevClose,
-    range,
+    minmax,
   } = match.groups;
-  const [min, max] = range.replace('R$', '').split('-').map(parseFloat);
+  const [min, max] = minmax.replace('R$', '').split('-').map(s => s.trim());
+  const change = ((1 - parseFloat(price) / parseFloat(prevClose)) * 100).toFixed(2) + '%';
   return {
     ticker,
     min,
-    price: parseFloat(price),
+    price,
     max,
-    prevClose: parseFloat(price),
-    change: ((1 - parseFloat(price) / parseFloat(prevClose)) * 100).toFixed(2) + '%',
+    prevClose,
+    change,
   }
 }
 
 const getInfo = async (ticker) => {
   try {
-    const timeout = new Promise(res => setTimeout(() => res(), 2000));
-    const req = new Promise(resolve => {
+    return new Promise((resolve, reject) => {
       const options = {
-        'method': 'GET',
-        'hostname': 'www.google.com',
-        'path': `/finance/quote/${ticker}:BVMF`,
+        method: 'GET',
+        hostname: 'www.google.com',
+        path: `/finance/quote/${ticker}:BVMF`,
+        timeout: 3000,
       };
       const req = http.request(options, function (res) {
         const chunks = [];
@@ -66,21 +64,26 @@ const getInfo = async (ticker) => {
         });
         res.on('error', (e) => {
           console.error(e);
-          resolve();
+          resolve(null);
         });
+      });
+      req.on('timeout', () => {
+        req.abort();
+        resolve(null);
       });
       req.end();
     });
-    return Promise.race([timeout, req]);
   } catch (e) {
-    console.error(e);
+    console.error('erro', e);
     return null;
   }
 }
 
 (async () => {
   console.log();
-  const infos = await Promise.all(tickers.map(getInfo));
+  const infos = await Promise.all(tickers.map(async t => await getInfo(t)));
   if (infos.filter(x => !!x).length) console.table(infos.filter(x => !!x));
+  const falharam = tickers.filter(t => !infos.filter(x => !!x).map(i => i.ticker).includes(t));
+  if (falharam.length) console.log('Falhou:', falharam.join(' '));
   console.log();
 })();
