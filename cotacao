@@ -9,13 +9,16 @@ if (tickerArgs.length) {
   tickers = tickerArgs.map(x => x).map(x => x.toUpperCase());
 } else {
   tickers = [
-    'AAPL34',
-    'BBDC4',
+		'AAPL34',
+		'AMZO34',
+		'BBDC4',
+		'GOGL34',
+		'ITUB4',
+		'NVDC34',
+		'TSLA34',
     'CVCB3',
     'FBOK34',
-    'ITUB4',
     'IVVB11',
-    'TSLA34',
   ];
 }
 
