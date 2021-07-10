@@ -1,13 +1,16 @@
 #!/bin/node
 const http = require('https');
 
-const tickerArgs = process.argv.slice(2, process.argv.length);
-
+const flags = {
+  '-t': false,
+  '-j': false,
+};
 const rgx = new RegExp(/YMlKec fxKbKc[\w\W\n]+?>R\$(?<price>.+?)<[\w\W\n]+?last closing price<[\w\W\n]+?P6K39c">R\$(?<prevClose>.+?)<[\w\W\n]+?P6K39c">R\$(?<minmax>.+?)</s);
+
+const args = process.argv.slice(2, process.argv.length);
 let tickers = [];
-if (tickerArgs.length) {
-  tickers = tickerArgs.map(x => x).map(x => x.toUpperCase());
-} else {
+args.forEach(a => Object.keys(flags).includes(a) ? flags[a] = true : tickers.push(a));
+if (!tickers.length) {
   tickers = [
 		'AAPL34',
 		'AMZO34',
@@ -83,10 +86,14 @@ const getInfo = async (ticker) => {
 }
 
 (async () => {
-  console.log();
+  if (!flags['-j']) console.log();
+  const start = new Date();
   const infos = await Promise.all(tickers.map(async t => await getInfo(t)));
-  if (infos.filter(x => !!x).length) console.table(infos.filter(x => !!x));
-  const falharam = tickers.filter(t => !infos.filter(x => !!x).map(i => i.ticker).includes(t));
-  if (falharam.length) console.log('Falhou:', falharam.join(' '));
+  const rslt = infos.filter(x => !!x);
+  rslt.filter(x => !!x).length ? flags['-j'] ? console.log(JSON.stringify(rslt)) : console.table(rslt) : null;
+  if (flags['-j']) return;
+  const falharam = tickers.filter(t => !rslt.map(i => i.ticker).includes(t));
+  if (falharam.length) console.log('Falharam:', falharam.join(' '));
+  if (flags['-t']) console.log(`cotacao demorou ${(new Date().valueOf() - start.valueOf())/1000}s para ${tickers.length} tickers`);
   console.log();
 })();
