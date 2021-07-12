@@ -38,7 +38,7 @@ const parseHTML = (html, ticker) => {
     minmax,
   } = match.groups;
   const [min, max] = minmax.replace('R$', '').split('-').map(s => s.trim());
-  const change = ((1 - parseFloat(price) / parseFloat(prevClose)) * 100).toFixed(2) + '%';
+  const change = ((parseFloat(price) / parseFloat(prevClose) - 1) * 100).toFixed(2) + '%';
   return {
     ticker,
     min,
